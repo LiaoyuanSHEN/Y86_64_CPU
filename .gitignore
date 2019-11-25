@@ -27,3 +27,7 @@ hs_err_pid*
 
 # gradle temp dir
 .gradle
+
+# build folder
+out/
+build/
