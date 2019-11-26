@@ -17,6 +17,7 @@ repositories {
 
 dependencies {
     compile('y86_64:Y86_64:0.0.0')
+    compile('y86_64:Y86_64_Bus:0.0.0')
 }
 
 def localMavenRepo = 'file://' + new File(System.getProperty('user.home'), '.m2/repository').absolutePath

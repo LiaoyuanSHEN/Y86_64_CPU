@@ -1,4 +1,4 @@
-package y86_64;
+package y86_64.cpu;
 
 public class Const {
 
