@@ -21,9 +21,12 @@ public class Const {
     public final static int R15 = 15;
 
     // CC
+    // zero flag
     public final static int ZF = 0;
+    // negative flag (the highest bit of last operation result)
     public final static int SF = 1;
-    public final static int QF = 2;
+    // overflow flag
+    public final static int OF = 2;
 
     // Status
     public final static int READY_CODE = 0;
@@ -33,24 +36,29 @@ public class Const {
     // Command
     /// V stands for a number(immediate)
     /// r* stands for a register
-    /// D(r*) stands for a value in memory with address equals r*
+    /// D(r*) stands for a value in memory with address equals (r* + D)
     public final static int nop = 0;
     public final static int halt = 1;
     // moves
     // irmoveq V rA -> 10 V (index of rA)
     public final static int irmoveq = 10;
-    // irmoveq rA rB -> 11 (index of rA) (index of rB)
+    // rrmoveq rA rB -> 11 (index of rA) (index of rB)
     public final static int rrmoveq = 11;
-    // irmoveq D(rA) rB -> 12 (index of rA) (index of rB) (value of D)
+    // mrmoveq D(rA) rB -> 12 (index of rA) (index of rB) (value of D)
     public final static int mrmoveq = 12;
-    // irmoveq rA D(rB) -> 12 (index of rA) (index of rB) (value of D)
+    // rmmoveq rA D(rB) -> 12 (index of rA) (index of rB) (value of D)
     public final static int rmmoveq = 13;
     // operations
+    // addq rA rB -> 20 (index of rA) (index of rB)
     public final static int addq = 20;
+    // subq rA rB -> 21 (index of rA) (index of rB)
     public final static int subq = 21;
+    // andq rA rB -> 22 (index of rA) (index of rB)
     public final static int andq = 22;
+    // xorq rA rB -> 23 (index of rA) (index of rB)
     public final static int xorq = 23;
     // jumps
+    // jm* Dest -> (code of jm*) (address of Dest)
     public final static int jmp = 30;
     public final static int jle = 31;
     public final static int jl = 32;
