@@ -6,14 +6,22 @@ import y86_64.exceptions.CpuException;
 import y86_64.exceptions.MemoryException;
 
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static y86_64.cpu.Const.*;
 
 public class TestCpu {
     public static void main(String[] args) throws CpuException {
-        CPU cpu = new CPUImpl(new MemoryImpl());
-        while (true) {
-            cpu.compute();
+//        CPU cpu = new CPUImpl(new MemoryImpl());
+//        while (true) {
+//            cpu.compute();
+//        }
+        Pattern movPattern = Pattern.compile("(\\d+)\\(([A-Z][A-Z0-1][A-Z0-9])\\)");
+        Matcher matcher = movPattern.matcher("12(R08)");
+        if (matcher.find()) {
+            System.out.println(matcher.group(1));
+            System.out.println(matcher.group(2));
         }
     }
 

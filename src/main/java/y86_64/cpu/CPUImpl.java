@@ -49,8 +49,8 @@ public class CPUImpl implements CPU {
                 registerIndex1 = (int) readNext();
                 registerIndex2 = (int) readNext();
                 memoryOffset = readNext();
-                memoryAddress = registers[registerIndex2] + memoryOffset;
-                registers[registerIndex1] = readFromMemory(memoryAddress);
+                memoryAddress = registers[registerIndex1] + memoryOffset;
+                registers[registerIndex2] = readFromMemory(memoryAddress);
                 break;
             case rmmoveq:
                 registerIndex1 = (int) readNext();
