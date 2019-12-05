@@ -1,6 +1,5 @@
 package y86_64.cpu;
 
-import y86_64.CPU;
 import y86_64.Memory;
 import y86_64.exceptions.CpuException;
 import y86_64.exceptions.MemoryException;
@@ -17,8 +16,9 @@ public class TestCpu {
 //        while (true) {
 //            cpu.compute();
 //        }
-        Pattern movPattern = Pattern.compile("(\\d+)\\(([A-Z][A-Z0-1][A-Z0-9])\\)");
-        Matcher matcher = movPattern.matcher("12(R08)");
+        Pattern movPattern = Pattern.compile("(\\d*)\\((%[A-Za-z][A-Za-z0-1][A-Za-z0-9])\\)");
+        Matcher matcher = movPattern.matcher("(%rbx)");
+        System.out.println("MOVES_123:".matches("^[_a-z0-9A-Z]*:$"));
         if (matcher.find()) {
             System.out.println(matcher.group(1));
             System.out.println(matcher.group(2));
@@ -29,17 +29,17 @@ public class TestCpu {
 
         private long[] memory = new long[] {
                 // addq test
-                irmoveq, 1, R08,
-                irmoveq, 2, R09,
+                irmovq, 1, R08,
+                irmovq, 2, R09,
                 addq, R08, R09,
-                irmoveq, 0, R10,
-                rmmoveq, R08, R10, 0,
+                irmovq, 0, R10,
+                rmmovq, R08, R10, 0,
                 // subq test
-                irmoveq, 1, R08,
-                irmoveq, 2, R09,
+                irmovq, 1, R08,
+                irmovq, 2, R09,
                 subq, R09, R08,
-                irmoveq, 0, R10,
-                rmmoveq, R09, R10, 0,
+                irmovq, 0, R10,
+                rmmovq, R09, R10, 0,
 
     };
 

@@ -35,24 +35,24 @@ public class CPUImpl implements CPU {
             case halt:
                 status = HALT_CODE;
                 break;
-            case irmoveq:
+            case irmovq:
                 value = readNext();
                 registerIndex1 = (int) readNext();
                 registers[registerIndex1] = value;
                 break;
-            case rrmoveq:
+            case rrmovq:
                 registerIndex1 = (int) readNext();
                 registerIndex2 = (int) readNext();
                 registers[registerIndex2] = registers[registerIndex1];
                 break;
-            case mrmoveq:
+            case mrmovq:
                 registerIndex1 = (int) readNext();
                 registerIndex2 = (int) readNext();
                 memoryOffset = readNext();
                 memoryAddress = registers[registerIndex1] + memoryOffset;
                 registers[registerIndex2] = readFromMemory(memoryAddress);
                 break;
-            case rmmoveq:
+            case rmmovq:
                 registerIndex1 = (int) readNext();
                 registerIndex2 = (int) readNext();
                 memoryOffset = readNext();

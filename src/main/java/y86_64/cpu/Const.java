@@ -34,31 +34,32 @@ public class Const {
     public final static int HALT_CODE = 2;
 
     // Command
-    /// V stands for a number(immediate)
-    /// r* stands for a register
-    /// D(r*) stands for a value in memory with address equals (r* + D)
+    /// $V stands for a number(immediate)
+    /// %r* stands for a register
+    /// D(%r*) stands for a value in memory with address equals (r* + D)
+    /// L stands for a label of code
     public final static int nop = 0;
     public final static int halt = 1;
     // moves
-    // irmoveq V rA -> 10 V (index of rA)
-    public final static int irmoveq = 10;
-    // rrmoveq rA rB -> 11 (index of rA) (index of rB)
-    public final static int rrmoveq = 11;
-    // mrmoveq D(rA) rB -> 12 (index of rA) (index of rB) (value of D)
-    public final static int mrmoveq = 12;
-    // rmmoveq rA D(rB) -> 12 (index of rA) (index of rB) (value of D)
-    public final static int rmmoveq = 13;
+    // irmovq $V %rA -> 10 V (index of rA)
+    public final static int irmovq = 10;
+    // rrmovq %rA %rB -> 11 (index of rA) (index of rB)
+    public final static int rrmovq = 11;
+    // mrmovq D(%rA) %rB -> 12 (index of rA) (index of rB) (value of D)
+    public final static int mrmovq = 12;
+    // rmmovq %rA D(%rB) -> 12 (index of rA) (index of rB) (value of D)
+    public final static int rmmovq = 13;
     // operations
-    // addq rA rB -> 20 (index of rA) (index of rB)
+    // addq %rA %rB -> 20 (index of rA) (index of rB)
     public final static int addq = 20;
-    // subq rA rB -> 21 (index of rA) (index of rB)
+    // subq %rA %rB -> 21 (index of rA) (index of rB)
     public final static int subq = 21;
-    // andq rA rB -> 22 (index of rA) (index of rB)
+    // andq %rA %rB -> 22 (index of rA) (index of rB)
     public final static int andq = 22;
-    // xorq rA rB -> 23 (index of rA) (index of rB)
+    // xorq %rA %rB -> 23 (index of rA) (index of rB)
     public final static int xorq = 23;
     // jumps
-    // jm* Dest -> (code of jm*) (address of Dest)
+    // jm* L -> (code of jm*) (address of label)
     public final static int jmp = 30;
     public final static int jle = 31;
     public final static int jl = 32;
@@ -67,7 +68,7 @@ public class Const {
     public final static int jge = 35;
     public final static int jg = 36;
     // condition moves
-    // cmov* rA rB -> (code of cmov*) (index of rA) (index of rB)
+    // cmov* %rA %rB -> (code of cmov*) (index of rA) (index of rB)
     public final static int cmovle = 40;
     public final static int cmovl = 41;
     public final static int cmove = 42;
@@ -75,14 +76,14 @@ public class Const {
     public final static int cmovge = 44;
     public final static int cmovg = 45;
     // calls
-    // call Dest -> 50 (address of Dest)
+    // call L -> 50 (address of label)
     public final static int call = 50;
     // ret -> 51
     public final static int ret = 51;
     // stack operations
-    // pushq rA -> 60 (index of rA)
+    // pushq %rA -> 60 (index of rA)
     public final static int pushq = 60;
-    // popq rA -> 61 (index of rA)
+    // popq %rA -> 61 (index of rA)
     public final static int popq = 61;
 
 }
