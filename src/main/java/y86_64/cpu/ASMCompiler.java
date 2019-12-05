@@ -30,7 +30,7 @@ public class ASMCompiler {
         long count = 0;
         while ((line = reader.readLine()) != null) {
             line = line.trim();
-            if (line.isEmpty()) {
+            if (line.isEmpty() || line.startsWith("#")) {
                 continue;
             }
             String[] codes = Arrays.stream(line.split("[\t, ]")).filter(s -> !s.isEmpty()).toArray(String[]::new);
@@ -516,38 +516,38 @@ public class ASMCompiler {
     }
 
     private static long toRegisterId(String registerName) {
-        switch (registerName.toUpperCase()) {
-            case "%RAX":
+        switch (registerName.toLowerCase()) {
+            case "%rax":
                 return RAX;
-            case "%RBX":
+            case "%rbx":
                 return RBX;
-            case "%RCX":
+            case "%rcx":
                 return RCX;
-            case "%RDX":
+            case "%rdx":
                 return RDX;
-            case "%RSP":
+            case "%rsp":
                 return RSP;
-            case "%RBP":
+            case "%rbp":
                 return RBP;
-            case "%RSI":
+            case "%rsi":
                 return RSI;
-            case "%RDI":
+            case "%rdi":
                 return RDI;
-            case "%R08":
+            case "%r08":
                 return R08;
-            case "%R09":
+            case "%r09":
                 return R09;
-            case "%R10":
+            case "%r10":
                 return R10;
-            case "%R11":
+            case "%r11":
                 return R11;
-            case "%R12":
+            case "%r12":
                 return R12;
-            case "%R13":
+            case "%r13":
                 return R13;
-            case "%R14":
+            case "%r14":
                 return R14;
-            case "%R15":
+            case "%r15":
                 return R15;
             default:
                 throw new IllegalArgumentException("Unsupported registerName: " + registerName);
@@ -591,45 +591,6 @@ public class ASMCompiler {
             default:
                 throw new IllegalArgumentException("Unsupported registerId: " + registerId);
         }
-    }
-
-}
-
-class InputOutputStream extends OutputStream {
-
-    private final List<Integer> list = new LinkedList<>();
-
-    @Override
-    public void write(int b) throws IOException {
-        list.add(b);
-    }
-
-    public InputStream toInputStream() {
-        return new InputStream() {
-
-            private Iterator<Integer> iterator = list.iterator();
-            private int length = list.size();
-            private int index = 1;
-
-            @Override
-            public int read() throws IOException {
-                if (iterator.hasNext()) {
-                    ++index;
-                    return iterator.next();
-                }
-                return -1;
-            }
-
-            @Override
-            public int available() throws IOException {
-                return length - index;
-            }
-
-            @Override
-            public synchronized void reset() throws IOException {
-                index = 1;
-            }
-        };
     }
 
 }
