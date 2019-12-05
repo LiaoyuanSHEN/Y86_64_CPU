@@ -67,6 +67,7 @@ public class Const {
     public final static int jge = 35;
     public final static int jg = 36;
     // condition moves
+    // cmov* rA rB -> (code of cmov*) (index of rA) (index of rB)
     public final static int cmovle = 40;
     public final static int cmovl = 41;
     public final static int cmove = 42;
@@ -74,10 +75,14 @@ public class Const {
     public final static int cmovge = 44;
     public final static int cmovg = 45;
     // calls
+    // call Dest -> 50 (address of Dest)
     public final static int call = 50;
+    // ret -> 51
     public final static int ret = 51;
     // stack operations
+    // pushq rA -> 60 (index of rA)
     public final static int pushq = 60;
+    // popq rA -> 61 (index of rA)
     public final static int popq = 61;
 
 }

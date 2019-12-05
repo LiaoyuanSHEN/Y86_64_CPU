@@ -28,7 +28,6 @@ public class TestCpu {
     private static class MemoryImpl implements Memory {
 
         private long[] memory = new long[] {
-                nop, nop, nop,
                 // addq test
                 irmoveq, 1, R08,
                 irmoveq, 2, R09,
