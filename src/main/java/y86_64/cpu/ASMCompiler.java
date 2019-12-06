@@ -16,18 +16,24 @@ public class ASMCompiler {
     }
 
     public static void main(String[] args) throws Throwable {
-        InputOutputStream outputStream = new InputOutputStream();
-        compile(ASMCompiler.class.getClassLoader().getResourceAsStream("test.asm"), outputStream);
-        decompile(outputStream.toInputStream(), System.out);
+        OutputToInputStream outputStream1 = new OutputToInputStream();
+        OutputToInputStream outputStream2 = new OutputToInputStream();
+        compile(ASMCompiler.class.getClassLoader().getResourceAsStream("test.asm"), outputStream1);
+        decompile(outputStream1.toInputStream(), outputStream2);
+        outputStream1.reset();
+        compile(outputStream2.toInputStream(), outputStream1);
+        decompile(outputStream1.toInputStream(), System.out);
     }
 
     public static void compile(InputStream is, OutputStream os) throws IOException {
         String line;
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-        Map<String, Long> table = new HashMap<>();
+        List<Long> codeArray = new ArrayList<>();
+        Map<String, List<Integer>> labelCallTable = new HashMap<>();
+        Map<String, Integer> labelDefTable = new HashMap<>();
         Pattern movPattern = Pattern.compile("(\\d*)\\((%[A-Za-z][A-Za-z0-1][A-Za-z0-9])\\)");
         Matcher matcher;
-        long count = 0;
+        int count = 0;
         while ((line = reader.readLine()) != null) {
             line = line.trim();
             if (line.isEmpty() || line.startsWith("#")) {
@@ -36,35 +42,35 @@ public class ASMCompiler {
             String[] codes = Arrays.stream(line.split("[\t, ]")).filter(s -> !s.isEmpty()).toArray(String[]::new);
             switch (codes[0].toLowerCase()) {
                 case "nop":
-                    TransportUtil.writeLongToOutputStream(nop, os);
+                    codeArray.add((long) nop);
                     count++;
                     break;
                 case "halt":
-                    TransportUtil.writeLongToOutputStream(halt, os);
+                    codeArray.add((long) halt);
                     count++;
                     break;
                 case "irmovq":
-                    TransportUtil.writeLongToOutputStream(irmovq, os);
-                    TransportUtil.writeLongToOutputStream(Long.parseLong(codes[1].replace("$","")), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) irmovq);
+                    codeArray.add(Long.parseLong(codes[1].replace("$", "")));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "rrmovq":
-                    TransportUtil.writeLongToOutputStream(rrmovq, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) rrmovq);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "mrmovq":
                     matcher = movPattern.matcher(codes[1]);
                     if (matcher.find()) {
-                        TransportUtil.writeLongToOutputStream(mrmovq, os);
-                        TransportUtil.writeLongToOutputStream(toRegisterId(matcher.group(2)), os);
-                        TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                        codeArray.add((long) mrmovq);
+                        codeArray.add(toRegisterId(matcher.group(2)));
+                        codeArray.add(toRegisterId(codes[2]));
                         if (matcher.group(1).isEmpty()) {
-                            TransportUtil.writeLongToOutputStream(0, os);
+                            codeArray.add(0L);
                         } else {
-                            TransportUtil.writeLongToOutputStream(Long.parseLong(matcher.group(1)), os);
+                            codeArray.add(Long.parseLong(matcher.group(1)));
                         }
                         count += 4;
                         break;
@@ -73,140 +79,173 @@ public class ASMCompiler {
                 case "rmmovq":
                     matcher = movPattern.matcher(codes[2]);
                     if (matcher.find()) {
-                        TransportUtil.writeLongToOutputStream(rmmovq, os);
-                        TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                        TransportUtil.writeLongToOutputStream(toRegisterId(matcher.group(2)), os);
+                        codeArray.add((long) rmmovq);
+                        codeArray.add(toRegisterId(codes[1]));
+                        codeArray.add(toRegisterId(matcher.group(2)));
                         if (matcher.group(1).isEmpty()) {
-                            TransportUtil.writeLongToOutputStream(0, os);
+                            codeArray.add(0L);
                         } else {
-                            TransportUtil.writeLongToOutputStream(Long.parseLong(matcher.group(1)), os);
+                            codeArray.add(Long.parseLong(matcher.group(1)));
                         }
                         count += 4;
                         break;
                     }
                     throw new IllegalArgumentException("Unrecognized pattern: " + codes[2]);
                 case "addq":
-                    TransportUtil.writeLongToOutputStream(addq, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) addq);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "subq":
-                    TransportUtil.writeLongToOutputStream(subq, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) subq);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "andq":
-                    TransportUtil.writeLongToOutputStream(andq, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) andq);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "xorq":
-                    TransportUtil.writeLongToOutputStream(xorq, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) xorq);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "jmp":
-                    TransportUtil.writeLongToOutputStream(jmp, os);
-                    TransportUtil.writeLongToOutputStream(table.get(codes[1]), os);
+                    codeArray.add((long) jmp);
+                    codeArray.add(0L);
+                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                    labelCallTable.get(codes[1]).add(count + 1);
                     count += 2;
                     break;
                 case "jle":
-                    TransportUtil.writeLongToOutputStream(jle, os);
-                    TransportUtil.writeLongToOutputStream(table.get(codes[1]), os);
+                    codeArray.add((long) jle);
+                    codeArray.add(0L);
+                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                    labelCallTable.get(codes[1]).add(count + 1);
                     count += 2;
                     break;
                 case "jl":
-                    TransportUtil.writeLongToOutputStream(jl, os);
-                    TransportUtil.writeLongToOutputStream(table.get(codes[1]), os);
+                    codeArray.add((long) jl);
+                    codeArray.add(0L);
+                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                    labelCallTable.get(codes[1]).add(count + 1);
                     count += 2;
                     break;
                 case "je":
-                    TransportUtil.writeLongToOutputStream(je, os);
-                    TransportUtil.writeLongToOutputStream(table.get(codes[1]), os);
+                    codeArray.add((long) je);
+                    codeArray.add(0L);
+                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                    labelCallTable.get(codes[1]).add(count + 1);
                     count += 2;
                     break;
                 case "jne":
-                    TransportUtil.writeLongToOutputStream(jne, os);
-                    TransportUtil.writeLongToOutputStream(table.get(codes[1]), os);
+                    codeArray.add((long) jne);
+                    codeArray.add(0L);
+                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                    labelCallTable.get(codes[1]).add(count + 1);
                     count += 2;
                     break;
                 case "jge":
-                    TransportUtil.writeLongToOutputStream(jge, os);
-                    TransportUtil.writeLongToOutputStream(table.get(codes[1]), os);
+                    codeArray.add((long) jge);
+                    codeArray.add(0L);
+                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                    labelCallTable.get(codes[1]).add(count + 1);
                     count += 2;
                     break;
                 case "jg":
-                    TransportUtil.writeLongToOutputStream(jg, os);
-                    TransportUtil.writeLongToOutputStream(table.get(codes[1]), os);
+                    codeArray.add((long) jg);
+                    codeArray.add(0L);
+                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                    labelCallTable.get(codes[1]).add(count + 1);
                     count += 2;
                     break;
                 case "cmovle":
-                    TransportUtil.writeLongToOutputStream(cmovle, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) cmovle);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "cmovl":
-                    TransportUtil.writeLongToOutputStream(cmovl, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) cmovl);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "cmove":
-                    TransportUtil.writeLongToOutputStream(cmove, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) cmove);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "cmovne":
-                    TransportUtil.writeLongToOutputStream(cmovne, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) cmovne);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "cmovge":
-                    TransportUtil.writeLongToOutputStream(cmovge, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) cmovge);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "cmovg":
-                    TransportUtil.writeLongToOutputStream(cmovg, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[2]), os);
+                    codeArray.add((long) cmovg);
+                    codeArray.add(toRegisterId(codes[1]));
+                    codeArray.add(toRegisterId(codes[2]));
                     count += 3;
                     break;
                 case "call":
-                    TransportUtil.writeLongToOutputStream(call, os);
-                    TransportUtil.writeLongToOutputStream(table.get(codes[1]), os);
+                    codeArray.add((long) call);
+                    codeArray.add(0L);
+                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                    labelCallTable.get(codes[1]).add(count + 1);
                     count += 2;
                     break;
                 case "ret":
-                    TransportUtil.writeLongToOutputStream(ret, os);
+                    codeArray.add((long) ret);
                     ++count;
                     break;
                 case "pushq":
-                    TransportUtil.writeLongToOutputStream(pushq, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
+                    codeArray.add((long) pushq);
+                    codeArray.add(toRegisterId(codes[1]));
                     count += 2;
                     break;
                 case "popq":
-                    TransportUtil.writeLongToOutputStream(popq, os);
-                    TransportUtil.writeLongToOutputStream(toRegisterId(codes[1]), os);
+                    codeArray.add((long) popq);
+                    codeArray.add(toRegisterId(codes[1]));
                     count += 2;
                     break;
                 default:
                     if (codes.length == 1 && codes[0].matches("^[_a-z0-9A-Z]*:$")) {
-                        table.put(codes[0].replace(":", ""), count);
+                        labelDefTable.put(codes[0].replace(":", ""), count);
                     } else {
                         throw new IllegalArgumentException(line);
                     }
             }
         }
+
+        labelDefTable.forEach((label, codeIndex) -> {
+            if (labelCallTable.containsKey(label)) {
+                labelCallTable
+                        .get(label)
+                        .forEach(index ->
+                                codeArray.set(index, (long) codeIndex));
+            }
+        });
+
+        codeArray.forEach(code -> {
+            try {
+                TransportUtil.writeLongToOutputStream(code, os);
+            } catch (IOException e) {
+                SneakyThrow.sneakyThrow(e);
+            }
+        });
     }
 
     public static void decompile(InputStream is, OutputStream os) throws IOException {
@@ -217,6 +256,7 @@ public class ASMCompiler {
         long memoryAddress;
         long memoryOffset;
         Map<Long, StringBuilder> lines = new LinkedHashMap<>();
+        Set<Long> labels = new HashSet<>();
         long count = 0;
         while ((value = (int) TransportUtil.readLongFromInputStream(is)) != -1) {
             switch (value) {
@@ -336,7 +376,7 @@ public class ASMCompiler {
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
-                    lines.compute(memoryAddress, ASMCompiler::labelAppender);
+                    labels.add(memoryAddress);
                     count += 2;
                     break;
                 case jle:
@@ -346,7 +386,7 @@ public class ASMCompiler {
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
-                    lines.compute(memoryAddress, ASMCompiler::labelAppender);
+                    labels.add(memoryAddress);
                     count += 2;
                     break;
                 case jl:
@@ -356,7 +396,7 @@ public class ASMCompiler {
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
-                    lines.compute(memoryAddress, ASMCompiler::labelAppender);
+                    labels.add(memoryAddress);
                     count += 2;
                     break;
                 case je:
@@ -366,7 +406,7 @@ public class ASMCompiler {
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
-                    lines.compute(memoryAddress, ASMCompiler::labelAppender);
+                    labels.add(memoryAddress);
                     count += 2;
                     break;
                 case jne:
@@ -376,7 +416,7 @@ public class ASMCompiler {
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
-                    lines.compute(memoryAddress, ASMCompiler::labelAppender);
+                    labels.add(memoryAddress);
                     count += 2;
                     break;
                 case jge:
@@ -386,7 +426,7 @@ public class ASMCompiler {
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
-                    lines.compute(memoryAddress, ASMCompiler::labelAppender);
+                    labels.add(memoryAddress);
                     count += 2;
                     break;
                 case jg:
@@ -396,7 +436,7 @@ public class ASMCompiler {
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
-                    lines.compute(memoryAddress, ASMCompiler::labelAppender);
+                    labels.add(memoryAddress);
                     count += 2;
                     break;
                 case cmovle:
@@ -466,7 +506,7 @@ public class ASMCompiler {
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
-                    lines.compute(memoryAddress, ASMCompiler::labelAppender);
+                    labels.add(memoryAddress);
                     count += 2;
                     break;
                 case ret:
@@ -494,7 +534,8 @@ public class ASMCompiler {
                     break;
             }
         }
-        os.write("\nL0:\n".getBytes());
+        labelAppender(0L, lines.get(0L));
+        labels.forEach(label -> labelAppender(label, lines.get(label)));
         lines.forEach((pos, stringBuilder) -> {
             try {
                 os.write(stringBuilder.toString().getBytes());
@@ -502,6 +543,7 @@ public class ASMCompiler {
                 SneakyThrow.sneakyThrow(e);
             }
         });
+        os.write("\n".getBytes());
     }
 
     private static StringBuilder labelAppender(Long pos, StringBuilder sb) {
@@ -565,7 +607,7 @@ public class ASMCompiler {
             case RDX:
                 return "%rdx";
             case RSP:
-                return "%rso";
+                return "%rsp";
             case RBP:
                 return "%rbp";
             case RSI:

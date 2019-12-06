@@ -15,6 +15,15 @@ OPERATIONS:
     andq %r08, %r09
     addq %r10, %r11
 
+JUMPS:
+    jmp MOVES
+    jle OPERATIONS
+    jl JUMPS
+    je CONDITION_MOVES
+    jne STACK_OPTIONS
+    jge MOVES
+    jg OPERATIONS
+
 CONDITION_MOVES:
     cmovle %r12, %r13
     cmovl %r13, %r14
@@ -30,12 +39,3 @@ CALLS:
 STACK_OPTIONS:
     pushq %rax
     popq %rbx
-
-JUMPS:
-    jmp MOVES
-    jle OPERATIONS
-    jl JUMPS
-    je CONDITION_MOVES
-    jne STACK_OPTIONS
-    jge MOVES
-    jg OPERATIONS

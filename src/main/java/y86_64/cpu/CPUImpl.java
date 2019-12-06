@@ -64,14 +64,14 @@ public class CPUImpl implements CPU {
                 registerIndex2 = (int) readNext();
                 value = registers[registerIndex1] + registers[registerIndex2];
                 setAddOPFlags(registers[registerIndex1], registers[registerIndex2], value);
-                registers[registerIndex1] = value;
+                registers[registerIndex2] = value;
                 break;
             case subq:
                 registerIndex1 = (int) readNext();
                 registerIndex2 = (int) readNext();
                 value = registers[registerIndex1] - registers[registerIndex2];
                 setAddOPFlags(registers[registerIndex1], -registers[registerIndex2], value);
-                registers[registerIndex1] = value;
+                registers[registerIndex2] = value;
                 break;
             case andq:
                 registerIndex1 = (int) readNext();
@@ -80,7 +80,7 @@ public class CPUImpl implements CPU {
                 flags[ZF] = value == 0;
                 flags[SF] = value < 0;
                 flags[OF] = false;
-                registers[registerIndex1] = value;
+                registers[registerIndex2] = value;
                 break;
             case xorq:
                 registerIndex1 = (int) readNext();
@@ -89,7 +89,7 @@ public class CPUImpl implements CPU {
                 flags[ZF] = value == 0;
                 flags[SF] = value < 0;
                 flags[OF] = false;
-                registers[registerIndex1] = value;
+                registers[registerIndex2] = value;
                 break;
             case jmp:
                 memoryAddress = readNext();
@@ -175,19 +175,19 @@ public class CPUImpl implements CPU {
                 break;
             case call:
                 registerIndex1 = (int) readNext();
-                writeToMemory(registers[RSP]++, pc);
+                writeToMemory(registers[RSP]--, pc);
                 pc = registerIndex1;
                 break;
             case ret:
-                pc = readFromMemory(--registers[RSP]);
+                pc = readFromMemory(++registers[RSP]);
                 break;
             case pushq:
                 registerIndex1 = (int) readNext();
-                writeToMemory(registers[RSP]++, registers[registerIndex1]);
+                writeToMemory(registers[RSP]--, registers[registerIndex1]);
                 break;
             case popq:
                 registerIndex1 = (int) readNext();
-                registers[registerIndex1] = readFromMemory(--registers[RSP]);
+                registers[registerIndex1] = readFromMemory(++registers[RSP]);
                 break;
             default:
                 throw new CpuException("Unknown operation code: " + operationCode);

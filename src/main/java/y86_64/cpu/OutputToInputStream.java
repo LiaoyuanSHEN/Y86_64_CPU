@@ -8,13 +8,17 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-class InputOutputStream extends OutputStream {
+class OutputToInputStream extends OutputStream {
 
     private final List<Integer> list = new LinkedList<>();
 
     @Override
     public void write(int b) throws IOException {
         list.add(b);
+    }
+
+    public void reset() {
+        list.clear();
     }
 
     public InputStream toInputStream() {

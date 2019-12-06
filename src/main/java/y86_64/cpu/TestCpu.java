@@ -2,17 +2,10 @@ package y86_64.cpu;
 
 import y86_64.CPU;
 import y86_64.Memory;
-import y86_64.exceptions.CpuException;
 import y86_64.exceptions.MemoryException;
 import y86_64.util.TransportUtil;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static y86_64.cpu.Const.*;
 
 public class TestCpu {
     public static void main(String[] args) throws Throwable {
@@ -34,7 +27,7 @@ public class TestCpu {
         private long[] memory = new long[1024 * 1024 * 64];
 
         MemoryImpl(String path) throws IOException {
-            InputOutputStream ios = new InputOutputStream();
+            OutputToInputStream ios = new OutputToInputStream();
             ASMCompiler.compile(MemoryImpl.class.getClassLoader().getResourceAsStream(path), ios);
             long value;
             int count = 0;
