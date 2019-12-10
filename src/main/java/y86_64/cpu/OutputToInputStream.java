@@ -10,11 +10,11 @@ import java.util.List;
 
 class OutputToInputStream extends OutputStream {
 
-    private final List<Integer> list = new LinkedList<>();
+    private final List<Byte> list = new LinkedList<>();
 
     @Override
     public void write(int b) throws IOException {
-        list.add(b);
+        list.add((byte) b);
     }
 
     public void reset() {
@@ -24,7 +24,7 @@ class OutputToInputStream extends OutputStream {
     public InputStream toInputStream() {
         return new InputStream() {
 
-            private Iterator<Integer> iterator = list.iterator();
+            private Iterator<Byte> iterator = list.iterator();
             private int length = list.size();
             private int index = 1;
 
@@ -32,7 +32,7 @@ class OutputToInputStream extends OutputStream {
             public int read() throws IOException {
                 if (iterator.hasNext()) {
                     ++index;
-                    return iterator.next();
+                    return 255 & iterator.next();
                 }
                 return -1;
             }

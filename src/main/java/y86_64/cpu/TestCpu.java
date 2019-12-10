@@ -3,13 +3,14 @@ package y86_64.cpu;
 import y86_64.CPU;
 import y86_64.Memory;
 import y86_64.exceptions.MemoryException;
-import y86_64.util.TransportUtil;
 
 import java.io.IOException;
 
 public class TestCpu {
     public static void main(String[] args) throws Throwable {
-        CPU cpu = new CPUImpl(new MemoryImpl("test.asm"));
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
+        CPU cpu = new CPUImpl(new MemoryImpl("sum.asm"));
         while (true) {
             cpu.compute();
         }
@@ -24,25 +25,21 @@ public class TestCpu {
 
     private static class MemoryImpl implements Memory {
 
-        private long[] memory = new long[1024 * 1024 * 64];
+        private byte[] memory = new byte[1024];
 
         MemoryImpl(String path) throws IOException {
             OutputToInputStream ios = new OutputToInputStream();
             ASMCompiler.compile(MemoryImpl.class.getClassLoader().getResourceAsStream(path), ios);
-            long value;
-            int count = 0;
-            while ((value = TransportUtil.readLongFromInputStream(ios.toInputStream())) != -1) {
-                memory[count++] = value;
-            }
+            ios.toInputStream().read(memory);
         }
 
         @Override
-        public long read(long address) throws MemoryException {
+        public byte readByte(long address) throws MemoryException {
             return memory[(int) address];
         }
 
         @Override
-        public void write(long address, long value) throws MemoryException {
+        public void writeByte(long address, byte value) throws MemoryException {
             memory[(int) address] = value;
         }
 

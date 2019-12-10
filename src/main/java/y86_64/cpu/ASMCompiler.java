@@ -1,7 +1,7 @@
 package y86_64.cpu;
 
 import y86_64.util.SneakyThrow;
-import y86_64.util.TransportUtil;
+import y86_64.util.TranslateUtil;
 
 import java.io.*;
 import java.util.*;
@@ -18,7 +18,7 @@ public class ASMCompiler {
     public static void main(String[] args) throws Throwable {
         OutputToInputStream outputStream1 = new OutputToInputStream();
         OutputToInputStream outputStream2 = new OutputToInputStream();
-        compile(ASMCompiler.class.getClassLoader().getResourceAsStream("test.asm"), outputStream1);
+        compile(ASMCompiler.class.getClassLoader().getResourceAsStream("sum.asm"), outputStream1);
         decompile(outputStream1.toInputStream(), outputStream2);
         outputStream1.reset();
         compile(outputStream2.toInputStream(), outputStream1);
@@ -28,12 +28,13 @@ public class ASMCompiler {
     public static void compile(InputStream is, OutputStream os) throws IOException {
         String line;
         BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-        List<Long> codeArray = new ArrayList<>();
+        List<Number> codeArray = new ArrayList<>();
         Map<String, List<Integer>> labelCallTable = new HashMap<>();
         Map<String, Integer> labelDefTable = new HashMap<>();
         Pattern movPattern = Pattern.compile("(\\d*)\\((%[A-Za-z][A-Za-z0-1][A-Za-z0-9])\\)");
         Matcher matcher;
-        int count = 0;
+        int codeCount = 0;
+        int commandCount = 0;
         while ((line = reader.readLine()) != null) {
             line = line.trim();
             if (line.isEmpty() || line.startsWith("#")) {
@@ -42,29 +43,33 @@ public class ASMCompiler {
             String[] codes = Arrays.stream(line.split("[\t, ]")).filter(s -> !s.isEmpty()).toArray(String[]::new);
             switch (codes[0].toLowerCase()) {
                 case "nop":
-                    codeArray.add((long) nop);
-                    count++;
+                    codeArray.add(nop);
+                    codeCount++;
+                    commandCount++;
                     break;
                 case "halt":
-                    codeArray.add((long) halt);
-                    count++;
+                    codeArray.add(halt);
+                    codeCount++;
+                    commandCount++;
                     break;
                 case "irmovq":
-                    codeArray.add((long) irmovq);
+                    codeArray.add(irmovq);
                     codeArray.add(Long.parseLong(codes[1].replace("$", "")));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 10;
                     break;
                 case "rrmovq":
-                    codeArray.add((long) rrmovq);
+                    codeArray.add(rrmovq);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "mrmovq":
                     matcher = movPattern.matcher(codes[1]);
                     if (matcher.find()) {
-                        codeArray.add((long) mrmovq);
+                        codeArray.add(mrmovq);
                         codeArray.add(toRegisterId(matcher.group(2)));
                         codeArray.add(toRegisterId(codes[2]));
                         if (matcher.group(1).isEmpty()) {
@@ -72,14 +77,15 @@ public class ASMCompiler {
                         } else {
                             codeArray.add(Long.parseLong(matcher.group(1)));
                         }
-                        count += 4;
+                        codeCount += 4;
+                        commandCount += 11;
                         break;
                     }
                     throw new IllegalArgumentException("Unrecognized pattern: " + codes[1]);
                 case "rmmovq":
                     matcher = movPattern.matcher(codes[2]);
                     if (matcher.find()) {
-                        codeArray.add((long) rmmovq);
+                        codeArray.add(rmmovq);
                         codeArray.add(toRegisterId(codes[1]));
                         codeArray.add(toRegisterId(matcher.group(2)));
                         if (matcher.group(1).isEmpty()) {
@@ -87,143 +93,197 @@ public class ASMCompiler {
                         } else {
                             codeArray.add(Long.parseLong(matcher.group(1)));
                         }
-                        count += 4;
+                        codeCount += 4;
+                        commandCount += 11;
                         break;
                     }
                     throw new IllegalArgumentException("Unrecognized pattern: " + codes[2]);
                 case "addq":
-                    codeArray.add((long) addq);
+                    codeArray.add(addq);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "subq":
-                    codeArray.add((long) subq);
+                    codeArray.add(subq);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "andq":
-                    codeArray.add((long) andq);
+                    codeArray.add(andq);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "xorq":
-                    codeArray.add((long) xorq);
+                    codeArray.add(xorq);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "jmp":
-                    codeArray.add((long) jmp);
-                    codeArray.add(0L);
-                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
-                    labelCallTable.get(codes[1]).add(count + 1);
-                    count += 2;
+                    codeArray.add(jmp);
+                    if (codes[1].startsWith("$")) {
+                        codeArray.add(Long.parseLong(codes[1].replace("$", "")));
+                    } else {
+                        codeArray.add(0L);
+                        labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                        labelCallTable.get(codes[1]).add(codeCount + 1);
+                        codeCount += 2;
+                        commandCount += 9;
+                    }
                     break;
                 case "jle":
-                    codeArray.add((long) jle);
-                    codeArray.add(0L);
-                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
-                    labelCallTable.get(codes[1]).add(count + 1);
-                    count += 2;
+                    codeArray.add(jle);
+                    if (codes[1].startsWith("$")) {
+                        codeArray.add(Long.parseLong(codes[1].replace("$", "")));
+                    } else {
+                        codeArray.add(0L);
+                        labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                        labelCallTable.get(codes[1]).add(codeCount + 1);
+                        codeCount += 2;
+                        commandCount += 9;
+                    }
                     break;
                 case "jl":
-                    codeArray.add((long) jl);
-                    codeArray.add(0L);
-                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
-                    labelCallTable.get(codes[1]).add(count + 1);
-                    count += 2;
+                    codeArray.add(jl);
+                    if (codes[1].startsWith("$")) {
+                        codeArray.add(Long.parseLong(codes[1].replace("$", "")));
+                    } else {
+                        codeArray.add(0L);
+                        labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                        labelCallTable.get(codes[1]).add(codeCount + 1);
+                        codeCount += 2;
+                        commandCount += 9;
+                    }
                     break;
                 case "je":
-                    codeArray.add((long) je);
-                    codeArray.add(0L);
-                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
-                    labelCallTable.get(codes[1]).add(count + 1);
-                    count += 2;
+                    codeArray.add(je);
+                    if (codes[1].startsWith("$")) {
+                        codeArray.add(Long.parseLong(codes[1].replace("$", "")));
+                    } else {
+                        codeArray.add(0L);
+                        labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                        labelCallTable.get(codes[1]).add(codeCount + 1);
+                        codeCount += 2;
+                        commandCount += 9;
+                    }
                     break;
                 case "jne":
-                    codeArray.add((long) jne);
-                    codeArray.add(0L);
-                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
-                    labelCallTable.get(codes[1]).add(count + 1);
-                    count += 2;
+                    codeArray.add(jne);
+                    if (codes[1].startsWith("$")) {
+                        codeArray.add(Long.parseLong(codes[1].replace("$", "")));
+                    } else {
+                        codeArray.add(0L);
+                        labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                        labelCallTable.get(codes[1]).add(codeCount + 1);
+                        codeCount += 2;
+                        commandCount += 9;
+                    }
                     break;
                 case "jge":
-                    codeArray.add((long) jge);
-                    codeArray.add(0L);
-                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
-                    labelCallTable.get(codes[1]).add(count + 1);
-                    count += 2;
+                    codeArray.add(jge);
+                    if (codes[1].startsWith("$")) {
+                        codeArray.add(Long.parseLong(codes[1].replace("$", "")));
+                    } else {
+                        codeArray.add(0L);
+                        labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                        labelCallTable.get(codes[1]).add(codeCount + 1);
+                        codeCount += 2;
+                        commandCount += 9;
+                    }
                     break;
                 case "jg":
-                    codeArray.add((long) jg);
-                    codeArray.add(0L);
-                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
-                    labelCallTable.get(codes[1]).add(count + 1);
-                    count += 2;
+                    codeArray.add(jg);
+                    if (codes[1].startsWith("$")) {
+                        codeArray.add(Long.parseLong(codes[1].replace("$", "")));
+                    } else {
+                        codeArray.add(0L);
+                        labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                        labelCallTable.get(codes[1]).add(codeCount + 1);
+                        codeCount += 2;
+                        commandCount += 9;
+                    }
                     break;
                 case "cmovle":
-                    codeArray.add((long) cmovle);
+                    codeArray.add(cmovle);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "cmovl":
-                    codeArray.add((long) cmovl);
+                    codeArray.add(cmovl);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "cmove":
-                    codeArray.add((long) cmove);
+                    codeArray.add(cmove);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "cmovne":
-                    codeArray.add((long) cmovne);
+                    codeArray.add(cmovne);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "cmovge":
-                    codeArray.add((long) cmovge);
+                    codeArray.add(cmovge);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "cmovg":
-                    codeArray.add((long) cmovg);
+                    codeArray.add(cmovg);
                     codeArray.add(toRegisterId(codes[1]));
                     codeArray.add(toRegisterId(codes[2]));
-                    count += 3;
+                    codeCount += 3;
+                    commandCount += 3;
                     break;
                 case "call":
-                    codeArray.add((long) call);
-                    codeArray.add(0L);
-                    labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
-                    labelCallTable.get(codes[1]).add(count + 1);
-                    count += 2;
+                    codeArray.add(call);
+                    if (codes[1].startsWith("$")) {
+                        codeArray.add(Long.parseLong(codes[1].replace("$", "")));
+                    } else {
+                        codeArray.add(0L);
+                        labelCallTable.computeIfAbsent(codes[1], k -> new LinkedList<>());
+                        labelCallTable.get(codes[1]).add(codeCount + 1);
+                        codeCount += 2;
+                        commandCount += 9;
+                    }
                     break;
                 case "ret":
-                    codeArray.add((long) ret);
-                    ++count;
+                    codeArray.add(ret);
+                    ++codeCount;
+                    ++commandCount;
                     break;
                 case "pushq":
-                    codeArray.add((long) pushq);
+                    codeArray.add(pushq);
                     codeArray.add(toRegisterId(codes[1]));
-                    count += 2;
+                    codeCount += 2;
+                    commandCount += 2;
                     break;
                 case "popq":
-                    codeArray.add((long) popq);
+                    codeArray.add(popq);
                     codeArray.add(toRegisterId(codes[1]));
-                    count += 2;
+                    codeCount += 2;
+                    commandCount += 2;
                     break;
                 default:
                     if (codes.length == 1 && codes[0].matches("^[_a-z0-9A-Z]*:$")) {
-                        labelDefTable.put(codes[0].replace(":", ""), count);
+                        labelDefTable.put(codes[0].replace(":", ""), commandCount);
                     } else {
                         throw new IllegalArgumentException(line);
                     }
@@ -241,7 +301,11 @@ public class ASMCompiler {
 
         codeArray.forEach(code -> {
             try {
-                TransportUtil.writeLongToOutputStream(code, os);
+                if (code instanceof Long) {
+                    os.write(TranslateUtil.toLongByteArray((Long) code));
+                } else if (code instanceof Byte) {
+                    os.write((Byte) code & 255);
+                }
             } catch (IOException e) {
                 SneakyThrow.sneakyThrow(e);
             }
@@ -251,14 +315,14 @@ public class ASMCompiler {
     public static void decompile(InputStream is, OutputStream os) throws IOException {
         int value;
         StringBuilder sb;
-        long register1Id;
-        long register2Id;
+        int register1Id;
+        int register2Id;
         long memoryAddress;
         long memoryOffset;
         Map<Long, StringBuilder> lines = new LinkedHashMap<>();
         Set<Long> labels = new HashSet<>();
         long count = 0;
-        while ((value = (int) TransportUtil.readLongFromInputStream(is)) != -1) {
+        while ((value = is.read()) != -1) {
             switch (value) {
                 case nop:
                     sb = new StringBuilder("    ");
@@ -277,27 +341,27 @@ public class ASMCompiler {
                 case irmovq:
                     sb = new StringBuilder("    ");
                     sb.append("irmovq $");
-                    sb.append(TransportUtil.readLongFromInputStream(is));
+                    sb.append(readLongFromInputStream(is));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
-                    count += 3;
+                    count += 10;
                     break;
                 case rrmovq:
                     sb = new StringBuilder("    ");
                     sb.append("rrmovq ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
                     break;
                 case mrmovq:
-                    register1Id = TransportUtil.readLongFromInputStream(is);
-                    register2Id = TransportUtil.readLongFromInputStream(is);
-                    memoryOffset = TransportUtil.readLongFromInputStream(is);
+                    register1Id = is.read();
+                    register2Id = is.read();
+                    memoryOffset = readLongFromInputStream(is);
                     sb = new StringBuilder("    ");
                     sb.append("mrmovq ");
                     if (memoryOffset != 0) {
@@ -309,12 +373,12 @@ public class ASMCompiler {
                     sb.append(toRegisterName(register2Id));
                     sb.append("\n");
                     lines.put(count, sb);
-                    count += 4;
+                    count += 11;
                     break;
                 case rmmovq:
-                    register1Id = TransportUtil.readLongFromInputStream(is);
-                    register2Id = TransportUtil.readLongFromInputStream(is);
-                    memoryOffset = TransportUtil.readLongFromInputStream(is);
+                    register1Id = is.read();
+                    register2Id = is.read();
+                    memoryOffset = readLongFromInputStream(is);
                     sb = new StringBuilder("    ");
                     sb.append("rmmovq ");
                     sb.append(toRegisterName(register1Id));
@@ -327,14 +391,14 @@ public class ASMCompiler {
                     sb.append(")");
                     sb.append("\n");
                     lines.put(count, sb);
-                    count += 4;
+                    count += 11;
                     break;
                 case addq:
                     sb = new StringBuilder("    ");
                     sb.append("addq ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
@@ -342,9 +406,9 @@ public class ASMCompiler {
                 case subq:
                     sb = new StringBuilder("    ");
                     sb.append("subq ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
@@ -352,9 +416,9 @@ public class ASMCompiler {
                 case andq:
                     sb = new StringBuilder("    ");
                     sb.append("andq ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
@@ -362,89 +426,89 @@ public class ASMCompiler {
                 case xorq:
                     sb = new StringBuilder("    ");
                     sb.append("xorq ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
                     break;
                 case jmp:
-                    memoryAddress = TransportUtil.readLongFromInputStream(is);
+                    memoryAddress = readLongFromInputStream(is);
                     sb = new StringBuilder("    ");
                     sb.append("jmp L");
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
                     labels.add(memoryAddress);
-                    count += 2;
+                    count += 9;
                     break;
                 case jle:
-                    memoryAddress = TransportUtil.readLongFromInputStream(is);
+                    memoryAddress = readLongFromInputStream(is);
                     sb = new StringBuilder("    ");
                     sb.append("jle L");
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
                     labels.add(memoryAddress);
-                    count += 2;
+                    count += 9;
                     break;
                 case jl:
-                    memoryAddress = TransportUtil.readLongFromInputStream(is);
+                    memoryAddress = readLongFromInputStream(is);
                     sb = new StringBuilder("    ");
                     sb.append("jl L");
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
                     labels.add(memoryAddress);
-                    count += 2;
+                    count += 9;
                     break;
                 case je:
-                    memoryAddress = TransportUtil.readLongFromInputStream(is);
+                    memoryAddress = readLongFromInputStream(is);
                     sb = new StringBuilder("    ");
                     sb.append("je L");
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
                     labels.add(memoryAddress);
-                    count += 2;
+                    count += 9;
                     break;
                 case jne:
-                    memoryAddress = TransportUtil.readLongFromInputStream(is);
+                    memoryAddress = readLongFromInputStream(is);
                     sb = new StringBuilder("    ");
                     sb.append("jne L");
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
                     labels.add(memoryAddress);
-                    count += 2;
+                    count += 9;
                     break;
                 case jge:
-                    memoryAddress = TransportUtil.readLongFromInputStream(is);
+                    memoryAddress = readLongFromInputStream(is);
                     sb = new StringBuilder("    ");
                     sb.append("jge L");
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
                     labels.add(memoryAddress);
-                    count += 2;
+                    count += 9;
                     break;
                 case jg:
-                    memoryAddress = TransportUtil.readLongFromInputStream(is);
+                    memoryAddress = readLongFromInputStream(is);
                     sb = new StringBuilder("    ");
                     sb.append("jg L");
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
                     labels.add(memoryAddress);
-                    count += 2;
+                    count += 9;
                     break;
                 case cmovle:
                     sb = new StringBuilder("    ");
                     sb.append("cmovle ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
@@ -452,9 +516,9 @@ public class ASMCompiler {
                 case cmovl:
                     sb = new StringBuilder("    ");
                     sb.append("cmovl ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
@@ -462,9 +526,9 @@ public class ASMCompiler {
                 case cmove:
                     sb = new StringBuilder("    ");
                     sb.append("cmove ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
@@ -472,9 +536,9 @@ public class ASMCompiler {
                 case cmovne:
                     sb = new StringBuilder("    ");
                     sb.append("cmovne ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
@@ -482,9 +546,9 @@ public class ASMCompiler {
                 case cmovge:
                     sb = new StringBuilder("    ");
                     sb.append("cmovge ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
@@ -492,22 +556,22 @@ public class ASMCompiler {
                 case cmovg:
                     sb = new StringBuilder("    ");
                     sb.append("cmovg ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append(", ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 3;
                     break;
                 case call:
-                    memoryAddress = TransportUtil.readLongFromInputStream(is);
+                    memoryAddress = readLongFromInputStream(is);
                     sb = new StringBuilder("    ");
                     sb.append("call L");
                     sb.append(memoryAddress);
                     sb.append("\n");
                     lines.put(count, sb);
                     labels.add(memoryAddress);
-                    count += 2;
+                    count += 9;
                     break;
                 case ret:
                     sb = new StringBuilder("    ");
@@ -519,7 +583,7 @@ public class ASMCompiler {
                 case pushq:
                     sb = new StringBuilder("    ");
                     sb.append("pushq ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 2;
@@ -527,7 +591,7 @@ public class ASMCompiler {
                 case popq:
                     sb = new StringBuilder("    ");
                     sb.append("popq ");
-                    sb.append(toRegisterName(TransportUtil.readLongFromInputStream(is)));
+                    sb.append(toRegisterName(is.read()));
                     sb.append("\n");
                     lines.put(count, sb);
                     count += 2;
@@ -557,7 +621,7 @@ public class ASMCompiler {
         return sb;
     }
 
-    private static long toRegisterId(String registerName) {
+    private static byte toRegisterId(String registerName) {
         switch (registerName.toLowerCase()) {
             case "%rax":
                 return RAX;
@@ -596,8 +660,8 @@ public class ASMCompiler {
         }
     }
 
-    private static String toRegisterName(long registerId) {
-        switch ((int) registerId) {
+    private static String toRegisterName(int registerId) {
+        switch (registerId) {
             case RAX:
                 return "%rax";
             case RBX:
@@ -633,6 +697,14 @@ public class ASMCompiler {
             default:
                 throw new IllegalArgumentException("Unsupported registerId: " + registerId);
         }
+    }
+    
+    private static Long readLongFromInputStream(InputStream is) throws IOException {
+        byte[] arr = new byte[8];
+        if (is.read(arr) == -1) {
+            throw new IOException("InputStream reach EOF.");
+        }
+        return TranslateUtil.fromLongByteArray(arr);
     }
 
 }

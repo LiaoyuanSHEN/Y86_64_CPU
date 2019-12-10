@@ -4,6 +4,7 @@ import y86_64.CPU;
 import y86_64.Memory;
 import y86_64.exceptions.CpuException;
 import y86_64.exceptions.MemoryException;
+import y86_64.util.TranslateUtil;
 
 import java.io.IOException;
 
@@ -13,9 +14,9 @@ public class CPUImpl implements CPU {
 
     private final long[] registers = new long[16];
     private final boolean[] flags = new boolean[3];
+    private final Memory memory;
     private long pc = 0;
     private int status = READY_CODE;
-    private final Memory memory;
 
     public CPUImpl(Memory memory) {
         this.memory = memory;
@@ -23,7 +24,10 @@ public class CPUImpl implements CPU {
 
     @Override
     public void compute() throws CpuException {
-        int operationCode = (int) readNext();
+        if (status == HALT_CODE) {
+            throw new CpuException("CPU status is halt.");
+        }
+        int operationCode = readNextByte();
         int registerIndex1;
         int registerIndex2;
         long memoryOffset;
@@ -36,46 +40,52 @@ public class CPUImpl implements CPU {
                 status = HALT_CODE;
                 break;
             case irmovq:
-                value = readNext();
-                registerIndex1 = (int) readNext();
+                value = readNextLong();
+                registerIndex1 = readNextByte();
                 registers[registerIndex1] = value;
                 break;
             case rrmovq:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
                 registers[registerIndex2] = registers[registerIndex1];
                 break;
             case mrmovq:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
-                memoryOffset = readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
+                memoryOffset = readNextLong();
                 memoryAddress = registers[registerIndex1] + memoryOffset;
-                registers[registerIndex2] = readFromMemory(memoryAddress);
+                registers[registerIndex2] = readLongFromMemory(memoryAddress);
                 break;
             case rmmovq:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
-                memoryOffset = readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
+                memoryOffset = readNextLong();
                 memoryAddress = registers[registerIndex2] + memoryOffset;
-                writeToMemory(memoryAddress, registers[registerIndex1]);
+                writeLongToMemory(memoryAddress, registers[registerIndex1]);
                 break;
             case addq:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
                 value = registers[registerIndex1] + registers[registerIndex2];
-                setAddOPFlags(registers[registerIndex1], registers[registerIndex2], value);
+                flags[ZF] = value == 0;
+                flags[SF] = value < 0;
+                flags[OF] = (registers[registerIndex1] < 0 && registers[registerIndex2] < 0 && value > 0)
+                        || (registers[registerIndex1] > 0 && registers[registerIndex2] > 0 && value < 0);
                 registers[registerIndex2] = value;
                 break;
             case subq:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
-                value = registers[registerIndex1] - registers[registerIndex2];
-                setAddOPFlags(registers[registerIndex1], -registers[registerIndex2], value);
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
+                value = registers[registerIndex2] - registers[registerIndex1];
+                flags[ZF] = value == 0;
+                flags[SF] = value < 0;
+                flags[OF] = (registers[registerIndex1] < 0 && registers[registerIndex2] > 0 && value < 0)
+                        || (registers[registerIndex1] > 0 && registers[registerIndex2] < 0 && value > 0);
                 registers[registerIndex2] = value;
                 break;
             case andq:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
                 value = registers[registerIndex1] & registers[registerIndex2];
                 flags[ZF] = value == 0;
                 flags[SF] = value < 0;
@@ -83,8 +93,8 @@ public class CPUImpl implements CPU {
                 registers[registerIndex2] = value;
                 break;
             case xorq:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
                 value = registers[registerIndex1] ^ registers[registerIndex2];
                 flags[ZF] = value == 0;
                 flags[SF] = value < 0;
@@ -92,102 +102,106 @@ public class CPUImpl implements CPU {
                 registers[registerIndex2] = value;
                 break;
             case jmp:
-                memoryAddress = readNext();
+                memoryAddress = readNextLong();
                 pc = memoryAddress;
                 break;
             case jle:
-                memoryAddress = readNext();
+                memoryAddress = readNextLong();
                 if (flags[ZF] || flags[SF] != flags[OF]) {
                     pc = memoryAddress;
                 }
                 break;
             case jl:
-                memoryAddress = readNext();
+                memoryAddress = readNextLong();
                 if (!flags[ZF] && flags[SF] != flags[OF]) {
                     pc = memoryAddress;
                 }
                 break;
             case je:
-                memoryAddress = readNext();
+                memoryAddress = readNextLong();
                 if (flags[ZF]) {
                     pc = memoryAddress;
                 }
                 break;
             case jne:
-                memoryAddress = readNext();
+                memoryAddress = readNextLong();
                 if (!flags[ZF]) {
                     pc = memoryAddress;
                 }
                 break;
             case jge:
-                memoryAddress = readNext();
+                memoryAddress = readNextLong();
                 if (flags[ZF] || flags[SF] == flags[OF]) {
                     pc = memoryAddress;
                 }
                 break;
             case jg:
-                memoryAddress = readNext();
+                memoryAddress = readNextLong();
                 if (!flags[ZF] || flags[SF] == flags[OF]) {
                     pc = memoryAddress;
                 }
                 break;
             case cmovle:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
                 if (flags[ZF] || flags[SF] != flags[OF]) {
                     registers[registerIndex2] = registers[registerIndex1];
                 }
                 break;
             case cmovl:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
                 if (!flags[ZF] && flags[SF] != flags[OF]) {
                     registers[registerIndex2] = registers[registerIndex1];
                 }
                 break;
             case cmove:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
                 if (flags[ZF]) {
                     registers[registerIndex2] = registers[registerIndex1];
                 }
                 break;
             case cmovne:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
                 if (!flags[ZF]) {
                     registers[registerIndex2] = registers[registerIndex1];
                 }
                 break;
             case cmovge:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
                 if (flags[ZF] || flags[SF] == flags[OF]) {
                     registers[registerIndex2] = registers[registerIndex1];
                 }
                 break;
             case cmovg:
-                registerIndex1 = (int) readNext();
-                registerIndex2 = (int) readNext();
+                registerIndex1 = readNextByte();
+                registerIndex2 = readNextByte();
                 if (!flags[ZF] || flags[SF] == flags[OF]) {
                     registers[registerIndex2] = registers[registerIndex1];
                 }
                 break;
             case call:
-                registerIndex1 = (int) readNext();
-                writeToMemory(registers[RSP]--, pc);
-                pc = registerIndex1;
+                memoryAddress = readNextLong();
+                writeLongToMemory(registers[RSP], pc);
+                registers[RSP] -= 8;
+                pc = memoryAddress;
                 break;
             case ret:
-                pc = readFromMemory(++registers[RSP]);
+                registers[RSP] += 8;
+                pc = readLongFromMemory(registers[RSP]);
                 break;
             case pushq:
-                registerIndex1 = (int) readNext();
-                writeToMemory(registers[RSP]--, registers[registerIndex1]);
+                registerIndex1 = readNextByte();
+                writeLongToMemory(registers[RSP], registers[registerIndex1]);
+                registers[RSP] -= 8;
                 break;
             case popq:
-                registerIndex1 = (int) readNext();
-                registers[registerIndex1] = readFromMemory(++registers[RSP]);
+                registerIndex1 = readNextByte();
+                registers[RSP] += 8;
+                registers[registerIndex1] = readLongFromMemory(registers[RSP]);
                 break;
             default:
                 throw new CpuException("Unknown operation code: " + operationCode);
@@ -204,34 +218,59 @@ public class CPUImpl implements CPU {
         // do nothing
     }
 
-    private void writeToMemory(long address, long value) {
+    private void writeLongToMemory(long address, long value) {
         try {
-            memory.write(address, value);
+            byte[] arr = TranslateUtil.toLongByteArray(value);
+            memory.writeByte(address, arr[0]);
+            memory.writeByte(address + 1, arr[1]);
+            memory.writeByte(address + 2, arr[2]);
+            memory.writeByte(address + 3, arr[3]);
+            memory.writeByte(address + 4, arr[4]);
+            memory.writeByte(address + 5, arr[5]);
+            memory.writeByte(address + 6, arr[6]);
+            memory.writeByte(address + 7, arr[7]);
         } catch (MemoryException e) {
             throw new IllegalStateException(e);
         }
     }
 
-    private long readFromMemory(long address) {
+    private byte readByteFromMemory(long address) {
         try {
-            return memory.read(address);
+            return memory.readByte(address);
         } catch (MemoryException e) {
             throw new IllegalStateException(e);
         }
     }
 
-    private long readNext() {
+    private long readLongFromMemory(long address) {
         try {
-            return memory.read(pc++);
+            byte[] arr = new byte[8];
+            arr[0] = memory.readByte(address);
+            arr[1] = memory.readByte(address + 1);
+            arr[2] = memory.readByte(address + 2);
+            arr[3] = memory.readByte(address + 3);
+            arr[4] = memory.readByte(address + 4);
+            arr[5] = memory.readByte(address + 5);
+            arr[6] = memory.readByte(address + 6);
+            arr[7] = memory.readByte(address + 7);
+            return TranslateUtil.fromLongByteArray(arr);
         } catch (MemoryException e) {
             throw new IllegalStateException(e);
         }
     }
 
-    private void setAddOPFlags(long register1Value, long register2Value, long value) {
-        flags[ZF] = value == 0;
-        flags[SF] = value < 0;
-        flags[OF] = (register1Value < 0 && register2Value < 0 && value > 0) || (register1Value > 0 && register2Value > 0 && value < 0);
+    private byte readNextByte() {
+        try {
+            return memory.readByte(pc++);
+        } catch (MemoryException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private long readNextLong() {
+        long value = readLongFromMemory(pc);
+        pc += 8;
+        return value;
     }
 
 }

@@ -1,8 +1,9 @@
 # entry main function
-    irmovq $1024, %rbp
-    irmovq $1024, %rsp
+    irmovq $1015, %rbp
+    irmovq $1015, %rsp
     call main
-    jmp end
+    # set halt to exit program
+    halt
 
 # long sum(long *start, long count)
 # start in %rdi, count in %rsi
@@ -20,7 +21,7 @@ loop:
     mrmovq (%rdi), %r10
     addq %r10, %rax
     addq %r08, %rdi
-    sub %r09, %rsi
+    subq %r09, %rsi
 test:
     jne loop
     # restoring previous stack info
@@ -30,11 +31,15 @@ test:
 
 # main
 main:
-    rrmovq %rsp, %r10
+    # saving previous stack info
+    pushq %rbp
+    rrmovq %rsp, %rbp
+
     irmovq $32, %r08
-    subq %r08, rsp
-    irmovq $24, %r08
-    subq %r08, %r10
+    subq %r08, %rsp
+    rrmovq %rsp, %r10
+    irmovq $8, %r09
+    addq %r09, %r10
     irmovq $1, %r09
     rmmovq %r09, (%r10)
     irmovq $2, %r09
@@ -44,8 +49,9 @@ main:
     irmovq $4, %r09
     rmmovq %r09, 24(%r10)
     rrmovq %r10, %rdi
-    irmovq %4, %rsi
+    irmovq $4, %rsi
     call sum
-
-end:
-    nop
+    # restoring previous stack info
+    rrmovq %rbp, %rsp
+    popq %rbp
+    ret
